@@ -47,8 +47,8 @@
     </div>
 
     <script>
-        // Dica: Para testar no celular, substitua 'localhost' pelo IP do seu computador na rede (ex: 192.168.0.10)
-        const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? "http://127.0.0.1:8000" : `http://${window.location.hostname}:8000`;
+        // Se estiver rodando no mesmo servidor, usa o origin atual, senão aponta para o localhost
+        const API_URL = window.location.protocol === 'file:' ? "http://127.0.0.1:8000" : window.location.origin;
         let html5QrCode;
 
         function iniciarApp() {
@@ -99,20 +99,20 @@
         }
 
         async function processarLeitura(url) {
-            // Tenta extrair a chave de 44 dígitos da URL do QR Code
-            const match = url.match(/(?:p|chNFe)=(\d{44})/) || url.match(/(\d{44})/);
-            if (!match) {
-                alert("QR Code inválido. Certifique-se de estar lendo uma Nota Fiscal.");
-                return;
-            }
-
-            const chave = match[1];
+            console.log("Conteúdo lido do QR Code:", url);
+            
+            const match = url.match(/(\d{44})/);
+            const chave = match ? match[1] : null;
+            const urlQr = !chave ? url : null;
             const cpf = document.getElementById('cpf_cidadao').value;
 
             // Para o scanner após a leitura
-            await html5QrCode.stop();
+            try {
+                await html5QrCode.stop();
+            } catch (e) { console.error(e); }
+            
             document.getElementById('btn-scan').style.display = 'block';
-
+            
             // Envia para o backend
             try {
                 const res = await fetch(`${API_URL}/notas/registrar`, {
@@ -121,6 +121,7 @@
                     body: JSON.stringify({
                         cpf_usuario: cpf,
                         chave_danfe: chave,
+                        url_qr: urlQr,
                         tipo: "PRODUTO"
                     })
                 });

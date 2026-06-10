@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, field_validator
+import requests
+from bs4 import BeautifulSoup
 import random
 import re
 from ..database import get_db
@@ -10,7 +12,8 @@ router = APIRouter(prefix="/notas", tags=["notas"])
 
 class NotaInput(BaseModel):
     cpf_usuario: str
-    chave_danfe: str
+    chave_danfe: str = None
+    url_qr: str = None
     tipo: str # 'PRODUTO' ou 'SERVICO'
 
     @field_validator('cpf_usuario')
@@ -41,14 +44,45 @@ class NotaInput(BaseModel):
     @field_validator('chave_danfe')
     @classmethod
     def validar_chave(cls, v: str):
-        if len(v) != 44 or not v.isdigit():
+        if v and (len(v) != 44 or not v.isdigit()):
             raise ValueError('A chave DANFE deve conter exatamente 44 dígitos numéricos.')
         return v
 
+def extrair_dados_sefaz_sc(url: str):
+    """Raspa dados do portal SEFAZ/SC quando a chave não está na URL"""
+    try:
+        response = requests.get(url, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Localiza a chave de acesso (ID comum no portal SC)
+        chave_tag = soup.find("span", {"id": "lbl_ChaveAcesso"})
+        chave = re.sub(r'\D', '', chave_tag.text) if chave_tag else None
+        
+        # Localiza o valor total
+        valor_tag = soup.find("span", {"id": "lbl_ValorTotal"})
+        valor = float(valor_tag.text.replace(',', '.')) if valor_tag else 0.0
+        
+        return chave, valor
+    except Exception as e:
+        print(f"Erro ao extrair dados: {e}")
+        return None, 0.0
+
 @router.post("/registrar")
 def registrar_nota(nota: NotaInput, db: Session = Depends(get_db)):
+    chave_final = nota.chave_danfe
+    valor_nota = 0.0
+
+    # 1. Se veio URL, tenta baixar os dados
+    if nota.url_qr and not chave_final:
+        chave_final, valor_nota = extrair_dados_sefaz_sc(nota.url_qr)
+        if not chave_final:
+            raise HTTPException(status_code=400, detail="Não foi possível extrair os dados desta URL da SEFAZ.")
+
+    if not chave_final:
+        raise HTTPException(status_code=400, detail="Chave DANFE não fornecida.")
+
     # 2. Verificar se a nota já foi registrada
-    db_nota = db.query(Nota).filter(Nota.chave_danfe == nota.chave_danfe).first()
+    db_nota = db.query(Nota).filter(Nota.chave_danfe == chave_final).first()
     if db_nota:
         raise HTTPException(status_code=400, detail="Nota fiscal já cadastrada no sistema.")
     
@@ -63,8 +97,9 @@ def registrar_nota(nota: NotaInput, db: Session = Depends(get_db)):
     # 4. Salvar a nota
     nova_nota = Nota(
         usuario_id=usuario.id,
-        chave_danfe=nota.chave_danfe,
+        chave_danfe=chave_final,
         tipo=nota.tipo.upper(),
+        valor=valor_nota,
         processada=True
     )
     db.add(nova_nota)
