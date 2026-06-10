@@ -1,0 +1,1 @@
+# Arquivo necessário para o Python tratar a pasta routes como um pacote

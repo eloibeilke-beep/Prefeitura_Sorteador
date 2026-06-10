@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iporã Premiada - Painel Administrativo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .container { margin-top: 50px; }
+        .card { box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .table-container { background: white; padding: 20px; border-radius: 8px; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="text-center mb-4">Iporã Premiada - Painel da Prefeitura</h2>
+        
+        <div class="row">
+            <!-- Formulário para Realizar Sorteio -->
+            <div class="col-md-4">
+                <div class="card p-4">
+                    <h4>Novo Sorteio</h4>
+                    <div class="mb-3">
+                        <label for="mesRef" class="form-label">Mês de Referência</label>
+                        <input type="text" id="mesRef" class="form-control" placeholder="Ex: Junho/2024">
+                    </div>
+                    <button onclick="realizarSorteio()" class="btn btn-primary w-100">Executar Sorteio</button>
+                </div>
+            </div>
+
+            <!-- Histórico -->
+            <div class="col-md-8">
+                <div class="table-container card">
+                    <h4>Histórico de Ganhadores</h4>
+                    <table class="table table-hover mt-3">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Data</th>
+                                <th>Mês</th>
+                                <th>ID Cupom</th>
+                                <th>Hash de Auditoria</th>
+                            </tr>
+                        </thead>
+                        <tbody id="listaSorteios">
+                            <!-- Preenchido via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+
+        async function carregarHistorico() {
+            try {
+                const response = await fetch(`${API_URL}/sorteios/historico`);
+                const dados = await response.json();
+                const tabela = document.getElementById('listaSorteios');
+                tabela.innerHTML = "";
+
+                dados.forEach(sorteio => {
+                    const dataFormatada = new Date(sorteio.data_sorteio).toLocaleString('pt-BR');
+                    tabela.innerHTML += `
+                        <tr>
+                            <td>${dataFormatada}</td>
+                            <td>${sorteio.mes_referencia}</td>
+                            <td><strong>${sorteio.cupom_vencedor_id}</strong></td>
+                            <td><small class="text-muted">${sorteio.hash_auditoria.substring(0, 15)}...</small></td>
+                        </tr>
+                    `;
+                });
+            } catch (error) {
+                console.error("Erro ao carregar histórico:", error);
+            }
+        }
+
+        async function realizarSorteio() {
+            const mes = document.getElementById('mesRef').value;
+            if (!mes) return alert("Informe o mês!");
+
+            try {
+                const response = await fetch(`${API_URL}/sorteios/realizar-mensal?mes=${mes}`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    const resultado = await response.json();
+                    alert(`Sorteio Realizado!\n\nGanhador: ${resultado.ganhador}\nCupom: ${resultado.cupom_premiado}`);
+                    carregarHistorico();
+                } else {
+                    const erro = await response.json();
+                    alert("Erro: " + erro.detail);
+                }
+            } catch (error) {
+                alert("Erro ao conectar com o servidor.");
+            }
+        }
+
+        // Carregar ao abrir a página
+        carregarHistorico();
+    </script>
+</body>
+</html>
