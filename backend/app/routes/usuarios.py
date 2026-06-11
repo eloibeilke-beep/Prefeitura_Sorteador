@@ -21,20 +21,3 @@ def cadastrar_usuario(user: UsuarioCreate, db: Session = Depends(get_db)):
     db.add(novo_usuario)
     db.commit()
     return {"mensagem": "Usuário cadastrado com sucesso!"}
-
-@router.get("/{cpf}/cupons")
-def listar_cupons(cpf: str, db: Session = Depends(get_db)):
-    # Busca o usuário pelo CPF
-    usuario = db.query(Usuario).filter(Usuario.cpf == cpf).first()
-    
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado ou ainda não possui notas cadastradas.")
-
-    return {
-        "nome": usuario.nome,
-        "cpf": usuario.cpf,
-        "total_cupons": len(usuario.cupons),
-        "cupons": [
-            {"numero": c.numero_cupom, "data_geracao": c.criado_em} for c in usuario.cupons
-        ]
-    }
