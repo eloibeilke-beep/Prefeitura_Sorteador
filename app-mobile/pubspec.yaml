@@ -1,0 +1,20 @@
+name: ipora_premiada
+description: Aplicativo mobile para o programa Iporã Premiada.
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  firebase_core: ^2.24.2
+  firebase_auth: ^4.15.3
+  dio: ^5.3.3
+  mobile_scanner: ^3.5.2
+  google_fonts: ^6.1.0
+  intl: ^0.18.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
